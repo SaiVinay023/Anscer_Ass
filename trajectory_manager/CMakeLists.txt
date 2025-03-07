@@ -37,6 +37,10 @@ install(TARGETS
   trajectory_reader_publisher
   DESTINATION lib/${PROJECT_NAME}
 )
+# Install launch files
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # Install service files
 install(DIRECTORY srv
