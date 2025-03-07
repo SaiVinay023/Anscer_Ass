@@ -56,4 +56,5 @@ if(BUILD_TESTING)
 endif()
 
 # Package export
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()
