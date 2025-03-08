@@ -38,19 +38,25 @@ def generate_launch_description():
             package="trajectory_manager",
             executable="trajectory_publisher_saver",
             name="trajectory_publisher_saver",
-            output="screen"
+            output="screen",
+            parameters=[{"use_sim_time": True}]
+
         ),
         Node(
             package="trajectory_manager",
             executable="trajectory_reader_publisher",
             name="trajectory_reader_publisher",
-            output="screen"
+            output="screen",
+            parameters=[{"use_sim_time": True}]
+
         ),
         Node(
             package="rviz2",
             executable="rviz2",
             name="rviz2",
             output="screen",
-            arguments=["-d", rviz_config_path]
+            arguments=["-d", rviz_config_path],
+            parameters=[{"use_sim_time": True}]
+
         )
     ])

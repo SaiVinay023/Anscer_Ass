@@ -56,11 +56,19 @@ private:
         
         trajectory_.push_back(pose);
     
-        RCLCPP_INFO(this->get_logger(), "Pose timestamp: %d sec", pose.header.stamp.sec);
+        // Print the current time and odometry timestamp
+        double now_time = this->now().seconds();
+        double pose_time = pose.header.stamp.sec;
+        double time_diff = now_time - pose_time;
+    
+        RCLCPP_INFO(this->get_logger(), "Current ROS Time: %.2f sec", now_time);
+        RCLCPP_INFO(this->get_logger(), "Pose Timestamp: %.2f sec", pose_time);
+        RCLCPP_INFO(this->get_logger(), "Time Difference: %.2f sec", time_diff);
         RCLCPP_INFO(this->get_logger(), "Trajectory size: %lu", trajectory_.size());
         
         publish_markers();
     }
+    
     
     
     
@@ -114,10 +122,13 @@ private:
     
         int saved_count = 0;
         for (const auto &pose : trajectory_) {
-            double time_diff = (now - pose.header.stamp).seconds(); // Compute time difference
+            double pose_time = pose.header.stamp.sec; 
+            double time_diff = now.seconds() - pose_time;  // Compute time difference
+            
+            // ✅ Debug: Print pose timestamps & filtering condition
             RCLCPP_INFO(this->get_logger(), "Pose timestamp: %d sec, Time difference: %.2f sec", pose.header.stamp.sec, time_diff);
     
-            if (time_diff <= request->duration) {
+            if (time_diff >= 0 && time_diff <= request->duration) {  
                 file << pose.header.stamp.sec << ","
                      << pose.pose.position.x << ","
                      << pose.pose.position.y << ","
@@ -134,8 +145,6 @@ private:
         
         return true;
     }
-    
-    
     
     
     
