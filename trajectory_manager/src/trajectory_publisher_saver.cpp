@@ -22,7 +22,7 @@ public:
     {
         // Subscribe to Odometry
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/odom", rclcpp::SensorDataQoS(),  
+            "/odom", rclcpp::QoS(rclcpp::KeepLast(10)).best_effort(),
             std::bind(&TrajectoryPublisherSaver::odom_callback, this, std::placeholders::_1)
         );
 
@@ -51,23 +51,30 @@ private:
     // Callback for Odometry messages
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
         geometry_msgs::msg::PoseStamped pose;
-        pose.header = msg->header;
-        pose.pose = msg->pose.pose;
-        
+        pose.header.stamp = this->now();
+        pose.header.frame_id = "odom";
+    
+        // Fake position values (increment over time)
+        static double fake_x = 0.0;
+        static double fake_y = 0.0;
+        fake_x += 0.05;  // Move in X-direction
+        fake_y += 0.02;  // Move in Y-direction
+    
+        pose.pose.position.x = fake_x;
+        pose.pose.position.y = fake_y;
+        pose.pose.position.z = 0.0;  // Assume movement on a 2D plane
+        pose.pose.orientation.w = 1.0;  // Identity quaternion
+    
+        // Add to trajectory storage
         trajectory_.push_back(pose);
     
-        // Print the current time and odometry timestamp
-        double now_time = this->now().seconds();
-        double pose_time = pose.header.stamp.sec;
-        double time_diff = now_time - pose_time;
-    
-        RCLCPP_INFO(this->get_logger(), "Current ROS Time: %.2f sec", now_time);
-        RCLCPP_INFO(this->get_logger(), "Pose Timestamp: %.2f sec", pose_time);
-        RCLCPP_INFO(this->get_logger(), "Time Difference: %.2f sec", time_diff);
+        // Debug output
+        RCLCPP_INFO(this->get_logger(), "Fake Pose: x=%.2f, y=%.2f, z=%.2f", fake_x, fake_y, pose.pose.position.z);
         RCLCPP_INFO(this->get_logger(), "Trajectory size: %lu", trajectory_.size());
-        
+    
         publish_markers();
     }
+    
     
     
     
@@ -107,7 +114,7 @@ private:
     {
         std::string file_path = "/home/vinay/Desktop/" + request->filename;
         std::ofstream file(file_path);
-        
+    
         if (!file.is_open()) {
             response->success = false;
             response->message = "Failed to open file!";
@@ -122,29 +129,27 @@ private:
     
         int saved_count = 0;
         for (const auto &pose : trajectory_) {
-            double pose_time = pose.header.stamp.sec; 
-            double time_diff = now.seconds() - pose_time;  // Compute time difference
-            
-            // ✅ Debug: Print pose timestamps & filtering condition
-            RCLCPP_INFO(this->get_logger(), "Pose timestamp: %d sec, Time difference: %.2f sec", pose.header.stamp.sec, time_diff);
+            //double pose_time = pose.header.stamp.sec;
+            //double time_diff = now.seconds() - pose_time;
     
-            if (time_diff >= 0 && time_diff <= request->duration) {  
+            //if (time_diff >= 0 && time_diff <= 300) { // Save last 5 minutes of data
                 file << pose.header.stamp.sec << ","
                      << pose.pose.position.x << ","
                      << pose.pose.position.y << ","
                      << pose.pose.position.z << "\n";
                 saved_count++;
-            }
+          //  }
         }
     
         file.close();
         RCLCPP_INFO(this->get_logger(), "Saved %d points to file.", saved_count);
-        
+    
         response->success = (saved_count > 0);
         response->message = saved_count > 0 ? "Trajectory saved successfully!" : "No points matched duration filter!";
         
         return true;
     }
+    
     
     
     
