@@ -56,11 +56,13 @@ private:
         
         trajectory_.push_back(pose);
     
-        RCLCPP_INFO(this->get_logger(), "Added Pose: x=%f, y=%f, z=%f", 
-                    pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
-    
+        RCLCPP_INFO(this->get_logger(), "Pose timestamp: %d sec", pose.header.stamp.sec);
+        RCLCPP_INFO(this->get_logger(), "Trajectory size: %lu", trajectory_.size());
+        
         publish_markers();
     }
+    
+    
     
 
     // Function to publish markers for visualization
@@ -95,9 +97,9 @@ private:
         const std::shared_ptr<trajectory_manager::srv::SaveTrajectory::Request> request,
         std::shared_ptr<trajectory_manager::srv::SaveTrajectory::Response> response) 
     {
-        std::string file_path = "/home/vinay/Desktop/Ros_vis/ros2_ws/src/Anscer_Ass" + request->filename;  // Change path
+        std::string file_path = "/home/vinay/Desktop/" + request->filename;
         std::ofstream file(file_path);
-    
+        
         if (!file.is_open()) {
             response->success = false;
             response->message = "Failed to open file!";
@@ -107,22 +109,35 @@ private:
     
         file << "timestamp,x,y,z\n";
         rclcpp::Time now = this->now();
+        
+        RCLCPP_INFO(this->get_logger(), "Saving trajectory with %lu points", trajectory_.size());
     
+        int saved_count = 0;
         for (const auto &pose : trajectory_) {
-            if ((now - pose.header.stamp).seconds() <= request->duration) {
+            double time_diff = (now - pose.header.stamp).seconds(); // Compute time difference
+            RCLCPP_INFO(this->get_logger(), "Pose timestamp: %d sec, Time difference: %.2f sec", pose.header.stamp.sec, time_diff);
+    
+            if (time_diff <= request->duration) {
                 file << pose.header.stamp.sec << ","
                      << pose.pose.position.x << ","
                      << pose.pose.position.y << ","
                      << pose.pose.position.z << "\n";
+                saved_count++;
             }
         }
     
         file.close();
-        response->success = true;
-        response->message = "Trajectory saved successfully!";
-        RCLCPP_INFO(this->get_logger(), "Trajectory saved to %s", file_path.c_str());
+        RCLCPP_INFO(this->get_logger(), "Saved %d points to file.", saved_count);
+        
+        response->success = (saved_count > 0);
+        response->message = saved_count > 0 ? "Trajectory saved successfully!" : "No points matched duration filter!";
+        
         return true;
     }
+    
+    
+    
+    
     
 };
 
