@@ -18,13 +18,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 
 # Add executable nodes
+add_executable(path_publisher src/path_publisher.cpp)
 add_executable(trajectory_publisher_saver src/trajectory_publisher_saver.cpp)
 add_executable(trajectory_reader_publisher src/trajectory_reader_publisher.cpp)
 
 # Link against required libraries
 ament_target_dependencies(trajectory_publisher_saver rclcpp std_msgs nav_msgs visualization_msgs tf2 tf2_ros)
 ament_target_dependencies(trajectory_reader_publisher rclcpp std_msgs nav_msgs visualization_msgs tf2 tf2_ros)
-
+ament_target_dependencies(path_publisher rclcpp nav_msgs geometry_msgs)
+install(TARGETS path_publisher DESTINATION lib/${PROJECT_NAME})
 
 # Ensure message generation is complete before building nodes
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_typesupport_cpp)
