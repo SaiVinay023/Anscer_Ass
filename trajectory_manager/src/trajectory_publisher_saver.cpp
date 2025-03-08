@@ -55,17 +55,13 @@ private:
         pose.pose = msg->pose.pose;
         
         trajectory_.push_back(pose);
-
-        // Remove old points that exceed the duration
-        double current_time = this->now().seconds();
-        while (!trajectory_.empty() && 
-               (current_time - trajectory_.front().header.stamp.sec > duration_)) 
-        {
-            trajectory_.erase(trajectory_.begin());
-        }
-
+    
+        RCLCPP_INFO(this->get_logger(), "Added Pose: x=%f, y=%f, z=%f", 
+                    pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+    
         publish_markers();
     }
+    
 
     // Function to publish markers for visualization
     void publish_markers() {
@@ -99,17 +95,19 @@ private:
         const std::shared_ptr<trajectory_manager::srv::SaveTrajectory::Request> request,
         std::shared_ptr<trajectory_manager::srv::SaveTrajectory::Response> response) 
     {
-        std::ofstream file(request->filename);
+        std::string file_path = "/home/vinay/Desktop/Ros_vis/ros2_ws/src/Anscer_Ass" + request->filename;  // Change path
+        std::ofstream file(file_path);
+    
         if (!file.is_open()) {
             response->success = false;
             response->message = "Failed to open file!";
-            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", request->filename.c_str());
+            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", file_path.c_str());
             return false;
         }
-
-        file << "timestamp,x,y,z\n";  // Header for CSV
+    
+        file << "timestamp,x,y,z\n";
         rclcpp::Time now = this->now();
-        
+    
         for (const auto &pose : trajectory_) {
             if ((now - pose.header.stamp).seconds() <= request->duration) {
                 file << pose.header.stamp.sec << ","
@@ -118,13 +116,14 @@ private:
                      << pose.pose.position.z << "\n";
             }
         }
-
+    
         file.close();
         response->success = true;
         response->message = "Trajectory saved successfully!";
-        RCLCPP_INFO(this->get_logger(), "Trajectory saved to %s", request->filename.c_str());
+        RCLCPP_INFO(this->get_logger(), "Trajectory saved to %s", file_path.c_str());
         return true;
     }
+    
 };
 
 int main(int argc, char **argv) {

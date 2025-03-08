@@ -1,73 +1,54 @@
 #include <rclcpp/rclcpp.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
+#include <nav_msgs/msg/path.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
 #include <fstream>
 #include <sstream>
-#include <rclcpp/qos.hpp>  // Add this at the top
-
 
 class TrajectoryReaderPublisher : public rclcpp::Node {
 public:
-    TrajectoryReaderPublisher() : Node("trajectory_reader_publisher"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_) {
-        // Publisher for visualization in RViz
-        rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).transient_local();
-        marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/trajectory_markers", qos_profile);        
-        // Read and publish trajectory on startup
-        read_and_publish_trajectory("trajectory.csv");
-
-        RCLCPP_INFO(this->get_logger(), "Trajectory Reader and Publisher Node Started");
+    TrajectoryReaderPublisher() : Node("trajectory_reader_publisher") {
+        path_pub_ = this->create_publisher<nav_msgs::msg::Path>("/robot_path", 10);
+        timer_ = this->create_wall_timer(
+            std::chrono::seconds(5), std::bind(&TrajectoryReaderPublisher::publish_trajectory, this));
     }
 
 private:
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
-    tf2_ros::Buffer tf_buffer_;
-    tf2_ros::TransformListener tf_listener_;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
 
-    void read_and_publish_trajectory(const std::string& filename) {
-        std::ifstream file(filename);
+    void publish_trajectory() {
+        nav_msgs::msg::Path path_msg;
+        path_msg.header.stamp = this->now();
+        path_msg.header.frame_id = "map";  
+
+        std::ifstream file("trajectory.csv");
         if (!file.is_open()) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", filename.c_str());
+            RCLCPP_ERROR(this->get_logger(), "Failed to open trajectory file!");
             return;
         }
 
-        visualization_msgs::msg::MarkerArray marker_array;
         std::string line;
-        int id = 0;
+        std::getline(file, line);  // Skip header
 
         while (std::getline(file, line)) {
-            std::istringstream ss(line);
-            double x, y, z;
-            char comma;
-            if (!(ss >> x >> comma >> y >> comma >> z)) {
-                RCLCPP_ERROR(this->get_logger(), "Invalid line format in file: %s", line.c_str());
-                continue;
-            }
+            std::stringstream ss(line);
+            std::string value;
+            geometry_msgs::msg::PoseStamped pose;
+            std::getline(ss, value, ',');
+            pose.header.stamp.sec = std::stoi(value);  
+            std::getline(ss, value, ',');
+            pose.pose.position.x = std::stod(value);
+            std::getline(ss, value, ',');
+            pose.pose.position.y = std::stod(value);
+            std::getline(ss, value, ',');
+            pose.pose.position.z = std::stod(value);
 
-            visualization_msgs::msg::Marker marker;
-            marker.header.frame_id = "odom";  // Assume odom frame for visualization
-            marker.header.stamp = this->now();
-            marker.ns = "trajectory";
-            marker.id = id++;
-            marker.type = visualization_msgs::msg::Marker::SPHERE;
-            marker.action = visualization_msgs::msg::Marker::ADD;
-            marker.pose.position.x = x;
-            marker.pose.position.y = y;
-            marker.pose.position.z = z;
-            marker.scale.x = 0.1;
-            marker.scale.y = 0.1;
-            marker.scale.z = 0.1;
-            marker.color.r = 0.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
-            marker.color.a = 1.0;
-            marker_array.markers.push_back(marker);
+            path_msg.poses.push_back(pose);
         }
 
-        marker_pub_->publish(marker_array);
         file.close();
-        RCLCPP_INFO(this->get_logger(), "Published trajectory markers from file: %s", filename.c_str());
+        path_pub_->publish(path_msg);
+        RCLCPP_INFO(this->get_logger(), "Published trajectory from file");
     }
 };
 
