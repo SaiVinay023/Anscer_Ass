@@ -2,6 +2,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <fstream>
@@ -14,9 +15,9 @@ class TrajectoryPublisherSaver : public rclcpp::Node {
 public:
     TrajectoryPublisherSaver() : Node("trajectory_publisher_saver"), tf_buffer_(this->get_clock()), tf_listener_(tf_buffer_) {
         // Subscribe to the robot's trajectory
-        path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
-            "/robot_path", 10, std::bind(&TrajectoryPublisherSaver::path_callback, this, _1));
-
+        odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+            "/odom", rclcpp::SensorDataQoS(),  
+            std::bind(&TrajectoryPublisherSaver::odom_callback, this, std::placeholders::_1));
         // Publisher for trajectory visualization in RViz
         rclcpp::QoS qos_profile = rclcpp::QoS(rclcpp::KeepLast(10)).transient_local(); // Ensures messages persist
         marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/trajectory_markers", qos_profile);
@@ -28,15 +29,19 @@ public:
     }
 
 private:
-    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
     rclcpp::Service<trajectory_manager::srv::SaveTrajectory>::SharedPtr save_service_;
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
     std::vector<geometry_msgs::msg::PoseStamped> trajectory_;
 
-    void path_callback(const nav_msgs::msg::Path::SharedPtr msg) {
-        trajectory_ = msg->poses;
+    void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+        geometry_msgs::msg::PoseStamped pose;
+        pose.header = msg->header;
+        pose.pose = msg->pose.pose;
+        
+        trajectory_.push_back(pose);
         publish_markers();
     }
 
