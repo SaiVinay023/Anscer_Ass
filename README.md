@@ -1,142 +1,148 @@
-# Anscer Assignment
-# Trajectory Manager
+# Trajectory Manager - README
 
-## Project Overview
-This ROS 2 package provides a trajectory recording, saving, and replaying system for a mobile robot. The system consists of:
+## Overview
+The **Trajectory Manager** is a ROS 2 package designed to record, save, and replay robot trajectories using Odometry data. The package includes multiple ROS nodes responsible for trajectory publishing, saving, and replaying. This README covers setup, execution, debugging, and troubleshooting steps.
 
-- Trajectory Publisher Saver: Subscribes to odometry (`/odom`), stores the trajectory, visualizes it in RViz, and saves it to a CSV file.
-- Trajectory Reader Publisher: Reads a saved trajectory from a CSV file and publishes it, allowing the robot to follow the saved path.
-- Gazebo Simulation: Simulated robot in Gazebo for trajectory collection and replay.
-- RViz Visualization: Displays trajectory markers in real-time.
-
-## Implemented Features
-✅ Odometry Subscription (`/odom`): Reads robot position in real-time.  
-✅ Trajectory Storage: Saves robot's trajectory in a vector.  
-✅ Visualization in RViz (`/trajectory_markers`): Shows trajectory using markers.  
-✅ Save Trajectory Service (`/save_trajectory`): Stores trajectory data in a CSV file.  
-✅ Replay from CSV: Loads and replays saved trajectory.  
-✅ Gazebo Integration: Simulates robot movement.  
-
----
-
-## Package Installation & Build
-### Install Dependencies
-Ensure you have ROS 2 (Humble) and required dependencies installed:
-```
-sudo apt update && sudo apt install -y ros-humble-gazebo-ros ros-humble-nav-msgs ros-humble-visualization-msgs ros-humble-rviz2 ros-humble-tf2-ros
-```
-
-### Clone the Repository
-```bash
-git clone https://github.com/SaiVinay023/Anscer_Ass.git ~/ros2_ws/src/Anscer_Ass
-cd ~/ros2_ws
-```
-
-### Build the Package
-```bash
-colcon build --packages-select trajectory_manager
-source install/setup.bash
-```
-
----
-
-## Execution Steps
-### Launch Gazebo & RViz
-Start the Gazebo simulation and RViz visualization:
-```bash
-ros2 launch trajectory_manager trajectory_manager_launch.py
-```
-💡 Expected Output:Gazebo should open with the robot, and RViz should display the trajectory markers.
-
-### Move the Robot (Using Teleop)
-```bash
-ros2 run turtlebot3_teleop teleop_keyboard
-```
-Move the robot using WASD keys.
-
-### Save Trajectory to CSV
-After moving the robot, call the service to save its trajectory:
-```bash
-ros2 service call /save_trajectory trajectory_manager/srv/SaveTrajectory "{filename: 'trajectory.csv', duration: 30.0}"
-```
-💡 Expected Output:
-```
-[INFO] [trajectory_publisher_saver]: Saving trajectory with 150 points.
-[INFO] [trajectory_publisher_saver]: Trajectory saved to /home/vinay/Desktop/trajectory.csv
-```
-Check if the file is saved:
-```bash
-cat ~/Desktop/trajectory.csv
-```
-
-### Replay the Saved Trajectory
-To replay the saved trajectory:
-```bash
-ros2 run trajectory_manager trajectory_reader_publisher
-```
-💡 Expected Behavior: The robot should follow the recorded path in Gazebo.
-
----
+## Features
+- **Trajectory Recording**: Subscribes to `/odom` and records the robot's movement.
+- **Trajectory Saving**: Saves recorded trajectory data to a CSV file.
+- **Trajectory Replay**: Reads the saved trajectory and publishes it for visualization.
+- **Visualization**: Publishes trajectory markers in RViz for easy debugging.
+- **Fake Data Handling**: Includes functionality to generate and save fake trajectory data for testing.
 
 ## Package Structure
 ```
 trajectory_manager/
-├── launch/
-│   ├── trajectory_manager_launch.py  # Launches Gazebo, RViz, and nodes
-│
-├── rviz/
-│   ├── trajectory_manager.rviz  # RViz configuration file
-│
 ├── src/
-│   ├── trajectory_publisher_saver.cpp  # Publishes and saves trajectory
-│   ├── trajectory_reader_publisher.cpp  # Reads and replays saved trajectory
-│
+│   ├── path_publisher.cpp
+│   ├── trajectory_publisher_saver.cpp
+│   ├── trajectory_reader_publisher.cpp
+│   ├── trajectory_reader.cpp
+│   ├── trajectory_replay_publisher.cpp
 ├── srv/
-│   ├── SaveTrajectory.srv  # ROS 2 service definition for saving trajectory
-│
-├── CMakeLists.txt  # ROS 2 package build file
-├── package.xml  # Package dependencies
+│   ├── SaveTrajectory.srv
+├── CMakeLists.txt
+├── package.xml
+├── rviz/
+│   ├── trajectory_manager.rviz
+├── launch/
+│   ├── trajectory_manager_launch.py
 ```
 
----
+## Nodes and Their Functionalities
 
-## Troubleshooting
-### Service Call Not Working
+### 1. `trajectory_publisher_saver`
+- **Subscribes to**: `/odom`
+- **Publishes**: `/trajectory_markers`
+- **Provides Service**: `/save_trajectory`
+- **Function**: Collects and stores trajectory points in memory, allows saving the trajectory to a file.
+- **Fake Data Usage**: If real odometry data is unavailable, fake trajectory points are generated and saved.
+
+### 2. `trajectory_reader_publisher`
+- **Subscribes to**: None
+- **Publishes**: `/trajectory_markers`
+- **Function**: Reads saved trajectory data from a CSV file and publishes it for visualization.
+
+### 3. `trajectory_replay_publisher`
+- **Subscribes to**: None
+- **Publishes**: `/cmd_vel`
+- **Function**: Reads saved trajectory and publishes velocity commands to make the robot follow it.
+
+## Installation and Setup
+### 1. Clone the Repository
 ```bash
-ros2 service list | grep save_trajectory
+cd ~/Desktop/Ros_vis/ros2_ws/src
+mkdir -p Anscer_Ass && cd Anscer_Ass
 ```
-If missing, restart the node:
+Place the `trajectory_manager` package inside `Anscer_Ass`.
+
+### 2. Build the Package
 ```bash
-ros2 run trajectory_manager trajectory_publisher_saver
+cd ~/Desktop/Ros_vis/ros2_ws
+colcon build --packages-select trajectory_manager
+source install/setup.bash
 ```
 
-### No Data Saved to CSV
-Check timestamps:
+### 3. Run Gazebo with TurtleBot3
 ```bash
-ros2 service call /save_trajectory trajectory_manager/srv/SaveTrajectory "{filename: 'test.csv', duration: 30.0}"
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 ```
-If Saved 0 points, adjust filtering in `save_trajectory_callback()`.
 
-### Gazebo Not Starting
-Manually start it:
+### 4. Start Teleoperation (to generate movement data)
 ```bash
-gazebo --verbose
+export TURTLEBOT3_MODEL=burger
+ros2 run turtlebot3_teleop teleop_keyboard
 ```
 
-### No Markers in RViz
-Ensure correct QoS settings for `/trajectory_markers`.
+### 5. Start the Trajectory Manager
 ```bash
-ros2 topic info /trajectory_markers --verbose
+ros2 launch trajectory_manager trajectory_manager_launch.py
 ```
 
----
+### 6. Save the Trajectory
+After moving the robot using teleop, run:
+```bash
+ros2 service call /save_trajectory trajectory_manager/srv/SaveTrajectory "{filename: 'trajectory.csv', duration: 300.0}"
+```
+This will save the last 5 minutes (300 seconds) of trajectory data.
 
-## Future Improvements
-🚀 Add robot autonomy to follow dynamic waypoints.
-🚀 Improve timestamp handling for more accurate replay. 
-🚀 Support multiple trajectory save & load.
+### 7. Replay the Trajectory
+```bash
+ros2 run trajectory_manager trajectory_replay_publisher
+```
 
----
+## Debugging and Troubleshooting
+### 1. Check Node Status
+```bash
+ros2 node list
+ros2 node info /trajectory_publisher_saver
+```
+
+### 2. Check Topic Data
+```bash
+ros2 topic list
+ros2 topic echo /odom
+ros2 topic echo /trajectory_markers
+```
+
+### 3. Ensure Data is Being Saved
+If data is not being saved, verify:
+- The robot has moved before calling the save service.
+- The `/odom` topic is publishing valid messages.
+- The `trajectory_publisher_saver` node is receiving odometry data.
+- If necessary, fake data can be injected to verify functionality.
+
+### 4. Gazebo Not Starting?
+Try manually starting Gazebo first:
+```bash
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+```
+Then launch the trajectory manager separately.
+
+### 5. Teleoperation Issues
+Ensure the correct model is set before running teleop:
+```bash
+export TURTLEBOT3_MODEL=burger
+ros2 run turtlebot3_teleop teleop_keyboard
+```
+
+## Further Enhancements
+- **Improve Data Storage**: Optimize trajectory data storage for large-scale operations.
+- **Dynamic Parameter Tuning**: Allow runtime adjustment of parameters such as trajectory duration and visualization settings.
+- **Multi-Robot Support**: Extend functionality to support multiple robots operating simultaneously.
+- **ROS2 Lifecycle Nodes**: Implement lifecycle management to enhance robustness and flexibility.
+
+## Conclusion
+This package successfully records, saves, and replays a TurtleBot3's trajectory. Ensure that Gazebo, teleop, and trajectory nodes are correctly launched for proper operation.
+
+For further troubleshooting, check logs using:
+```bash
+ros2 launch trajectory_manager trajectory_manager_launch.py --debug
+```
+Happy Robotics Development! 🚀
+
+
 
 ## Authors
 - Saivinay Manda  
